@@ -6,6 +6,8 @@ import { Provider } from '@hashgraph/sdk/lib/Provider';
 import { Greeter } from '../typechain-types';
 
 dotenv.config()
+const baseURL = 'https://testnet.mirrornode.hedera.com/api/v1/';
+const axios = require('axios').default.create({ baseURL });
 
 const operatorId = process.env.OPERATOR_ACCOUNT_ID!;
 const operatorPrivateKey = process.env.OPERATOR_PRIVATE_KEY!;
@@ -25,38 +27,31 @@ describe('RPC', function() {
     const Greeter = await ethers.getContractFactory('Greeter', wallet);
     greeter = await Greeter.deploy(init_message);
     const receipt = await greeter.deployTransaction.wait();
-    contractID = ContractId.fromSolidityAddress(receipt.contractAddress);
-    console.log(contractID);
+    contractAddress = receipt.contractAddress;
+    contractID = ContractId.fromSolidityAddress(contractAddress);
+    console.log(contractID, contractAddress);
   });
 
   it('should be able to deploy a contract', async function() {
     expect(contractAddress).to.not.be.null;
   });
 
-  it('should be able to call a contract', async function() {
-    const partialTxParams = await greeter.populateTransaction.greet() as any;
-
+  it.only('should be able to call a contract', async function() {
+    let partialTxParams = await greeter.populateTransaction.greet() as any;
+    partialTxParams.to = contractID.toSolidityAddress();
+    
     const fullTxParams = await wallet.populateTransaction(partialTxParams);
     const signedTx = await wallet.signTransaction(fullTxParams);
-
+    
     const tx = await ethers.provider.send('eth_sendRawTransaction', [signedTx]);
     expect(tx).to.not.be.null;
-  });
+    // wait for consensus
+    await new Promise((resolve) => setTimeout(resolve, 10000));
 
-  it('should be able to call a contract and read a returned value', async function() {
-    const contractQueryTx1 = new ContractCallQuery()
-    .setContractId(contractID)
-    .setGas(100000)
-    .setFunction(
-      "greet",
-      new ContractFunctionParameters()
-    );
+    const receipt = await ethers.provider.getTransactionReceipt(tx);
+    console.log("the reciept", receipt);
+    const resMirrorNode = await axios.get(`contracts/results/${tx}`);
 
-    const contractQuerySubmit1 = await contractQueryTx1.execute(client);
-    const contractQueryResult1 = contractQuerySubmit1.getUint256(0);
-    console.log(
-      `- Here's the greeting you asked for: ${contractQueryResult1} \n`
-    );
-    expect(contractQueryResult1).to.be.equal(init_message);
+    console.log('resMirrorNode.data', resMirrorNode.data)
   });
 });
