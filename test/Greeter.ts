@@ -22,6 +22,7 @@ describe('RPC', function() {
   let contractID: ContractId;
 
   before(async () => {
+    
     provider = await new ethers.providers.JsonRpcProvider(process.env.RELAY_ENDPOINT);
     wallet = await new ethers.Wallet( process.env.OPERATOR_PRIVATE_KEY, provider);
     const Greeter = await ethers.getContractFactory('Greeter', wallet);
@@ -36,7 +37,7 @@ describe('RPC', function() {
     expect(contractAddress).to.not.be.null;
   });
 
-  it.only('should be able to call a contract', async function() {
+  it('should be able to call a contract', async function() {
     let partialTxParams = await greeter.populateTransaction.greet() as any;
     partialTxParams.to = contractID.toSolidityAddress();
     
@@ -48,10 +49,8 @@ describe('RPC', function() {
     // wait for consensus
     await new Promise((resolve) => setTimeout(resolve, 10000));
 
-    const receipt = await ethers.provider.getTransactionReceipt(tx);
-    console.log("the reciept", receipt);
     const resMirrorNode = await axios.get(`contracts/results/${tx}`);
 
-    console.log('resMirrorNode.data', resMirrorNode.data)
+    console.log('resMirrorNode.data', resMirrorNode.data.call_result)
   });
 });
